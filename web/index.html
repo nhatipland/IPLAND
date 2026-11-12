@@ -1,0 +1,63 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CareAI - Quản lý</title>
+<style>
+:root{--bg:#f6f7f9;--fg:#1c2330;--card:#fff;--mut:#667;--bd:#dde1e8;--ac:#1d6fd8;--bad:#c62828;--ok:#2e7d32;--warn:#b26a00}
+@media(prefers-color-scheme:dark){:root{--bg:#12161d;--fg:#e6e9ef;--card:#1b212b;--mut:#9aa3b2;--bd:#2c3441;--ac:#6aa7ff;--bad:#ff8a80;--ok:#81c784;--warn:#ffb74d}}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif}
+header{padding:10px 16px;background:var(--card);border-bottom:1px solid var(--bd);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+nav{display:flex;gap:4px;flex-wrap:wrap;padding:8px 16px}nav button{border:1px solid var(--bd);background:var(--card);color:var(--fg);padding:6px 12px;border-radius:6px;cursor:pointer}
+nav button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+main{padding:8px 16px 40px;max-width:1100px}.card{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:12px;margin:8px 0}
+.tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;border:1px solid var(--bd);color:var(--mut)}.sim{color:var(--warn);border-color:var(--warn)}
+.bad{color:var(--bad)}.ok{color:var(--ok)}.mut{color:var(--mut);font-size:13px}button.a{background:var(--ac);color:#fff;border:0;padding:5px 10px;border-radius:6px;cursor:pointer}button.d{background:var(--bad);color:#fff;border:0;padding:5px 10px;border-radius:6px;cursor:pointer}
+input,select,textarea{background:var(--card);color:var(--fg);border:1px solid var(--bd);border-radius:6px;padding:4px 6px}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--bd);padding:4px 6px;text-align:left;vertical-align:top}
+.banner{background:var(--warn);color:#000;padding:6px 16px;font-size:13px}
+</style></head><body>
+<div class="banner" id="ban"></div>
+<header><b>CareAI · Quản lý</b><span id="st" class="mut"></span><span style="flex:1"></span>
+<button class="d" id="kill"></button></header>
+<nav id="nav"></nav><main id="m">Nhập token quản lý để bắt đầu.</main>
+<script>
+let T=sessionStorage.getItem('tok')||'',S={},tab='status';
+const E=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const dtf=t=>t?new Date(t*1000).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}):'';
+async function api(p,b){const r=await fetch('/api/'+p,{method:b?'POST':'GET',headers:{Authorization:'Bearer '+T,'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});
+ const j=await r.json();if(!r.ok){alert(j.error||r.status);throw j}return j}
+const tabs={status:'Kết nối',groups:'Nhóm & vai trò',drafts:'Xem trước trả lời',report:'Báo cáo',alerts:'Cảnh báo',tasks:'Việc cần xử lý',kb:'Kiến thức',style:'Phong cách',audit:'Nhật ký'};
+function nav(){document.getElementById('nav').innerHTML=Object.entries(tabs).map(([k,v])=>`<button class="${k==tab?'on':''}" onclick="go('${k}')">${v}</button>`).join('')}
+async function go(t){tab=t;nav();await R[t]()}
+const M=h=>document.getElementById('m').innerHTML=h;
+async function boot(){if(!T){T=prompt('Token quản lý (không dán vào chat):')||'';sessionStorage.setItem('tok',T)}
+ try{S=await api('status')}catch(e){sessionStorage.removeItem('tok');T='';return}
+ document.getElementById('st').textContent='Vai trò: '+S.role+' · AI: '+S.llm;
+ document.getElementById('ban').textContent=S.standards.approved?'':'⚠ '+S.standards.label;
+ document.getElementById('ban').style.display=S.standards.approved?'none':'block';
+ const k=document.getElementById('kill');k.textContent=S.kill_switch?'AI ĐANG DỪNG KHẨN CẤP - bấm để mở lại':'DỪNG KHẨN CẤP TOÀN HỆ THỐNG';
+ k.onclick=async()=>{if(confirm(S.kill_switch?'Mở lại AI?':'Dừng mọi trả lời của AI?')){await api('kill',{on:!S.kill_switch});boot()}};
+ go(tab)}
+const R={
+ async status(){M('<h3>Tình trạng kênh</h3>'+(S.channels.map(c=>`<div class=card><b>${E(c.channel)}</b> <span class="tag ${c.state=='ok'?'':'sim'}">${E(c.state)}</span> ${E(c.detail)}<div class=mut>${dtf(c.ts)}</div></div>`).join('')||'<div class=card>Chưa có kênh nào được cấu hình. Zalo/Messenger CHƯA kết nối thật - xem docs/feasibility.md.</div>'))},
+ async groups(){const gs=await api('groups');let h='';for(const g of gs){const ms=await api('members/'+g.id);
+  h+=`<div class=card><b>${E(g.name)}</b> <span class=tag>${E(g.channel)}</span>${g.source=='simulated'?'<span class="tag sim">GIẢ LẬP</span>':''} <span class=mut>mã: ${E(g.customer_code)}</span><br>
+  Cho phép <input type=checkbox ${g.allowed?'checked':''} onchange="api('group/update',{id:${g.id},allowed:this.checked?1:0})">
+  Chế độ <select onchange="api('group/update',{id:${g.id},mode:this.value})">${['off','preview','live'].map(m=>`<option ${m==g.mode?'selected':''}>${m}</option>`).join('')}</select>
+  <button class=a onclick="api('group/pause',{id:${g.id},paused:${g.paused?0:1}}).then(()=>go('groups'))">${g.paused?'Cho AI chạy lại':'Tạm dừng AI (tiếp quản)'}</button>
+  <table>${ms.map(m=>`<tr><td>${E(m.display_name)}</td><td><select onchange="api('member/role',{group_id:${g.id},ext_id:'${E(m.ext_id)}',role:this.value})">${['unknown','customer','cskh','coach','manager','ai'].map(r=>`<option ${r==m.role?'selected':''}>${r}</option>`).join('')}</select></td></tr>`).join('')}</table></div>`}
+  M(h+'<div class=mut>Mặc định mọi nhóm mới: KHÔNG được phép. "live" chỉ bật sau khi bạn xác nhận.</div>')},
+ async drafts(){const d=await api('drafts');M('<button class=a onclick="api(\'tick\',{}).then(()=>go(\'drafts\'))">Xử lý tin chờ (tick)</button>'+d.map(x=>`<div class=card><span class=tag>${E(x.status)}</span> ${E(x.gname)} · ${dtf(x.created)} <span class=mut>cờ: ${E(x.flags)}</span><br><textarea id=t${x.id} rows=3 style="width:100%">${E(x.text)}</textarea>
+  ${x.status=='pending'?`<button class=a onclick="api('draft/approve',{id:${x.id},text:document.getElementById('t${x.id}').value}).then(r=>{alert(r.ok?'Đã gửi':r.reason);go('drafts')})">Duyệt & gửi</button> <button class=d onclick="api('draft/reject',{id:${x.id}}).then(()=>go('drafts'))">Bỏ</button>`:''}</div>`).join(''))},
+ async report(){const r=await api('report');M(`<div class=card>${E(r.audience)} · ${E(r.standards_label)}</div>`+r.groups.map(g=>`<div class=card><b>${E(g.group)}</b> ${g.source=='simulated'?'<span class="tag sim">DỮ LIỆU GIẢ LẬP</span>':''}<div class=mut>${E(JSON.stringify(g.stats))}</div>
+  <p class=ok>Điểm tốt: ${E(g.good.map(f=>f.text).join('; ')||'chưa ghi nhận')}</p>${g.issues.map(f=>`<div>• <span class=tag>${E(f.type)}/${E(f.confidence)}</span> ${E(f.text)}<div class=mut>Bằng chứng: ${E(f.evidence.map(e=>e.ts?dtf(e.ts)+' "'+e.text+'"':JSON.stringify(e)).join(' | '))} — ${E(f.note)}</div></div>`).join('')}
+  <p class=mut>Thiếu dữ liệu: ${E(g.missing_data.join('; ')||'không')}</p></div>`).join(''))},
+ async alerts(){const a=await api('alerts');M(a.alerts.map(x=>`<div class=card><span class=tag>${E(x.kind)}</span> ${E(x.group||'')} ${E(x.text)}</div>`).join('')||'<div class=card>Không có cảnh báo.</div>')},
+ async tasks(){const t=await api('tasks');M('<div class=card>Tạo việc: <input id=tt placeholder="Việc"> <input id=ta placeholder="Người phụ trách"> <button class=a onclick="api(\'task\',{title:tt.value,assignee:ta.value}).then(()=>go(\'tasks\'))">Thêm</button></div>'+t.map(x=>`<div class=card>${E(x.title)} · ${E(x.assignee)} · <span class=tag>${E(x.status)}</span> <button class=a onclick="api('task/status',{id:${x.id},status:'done'}).then(()=>go('tasks'))">Xong</button></div>`).join(''))},
+ async kb(){const k=await api('kb');M(k.map(d=>`<div class=card><b>${E(d.title)}</b> v${d.version} <span class=tag>${d.approved?'đã duyệt':'chưa duyệt'}</span><br>${E(d.body)}<br><button class=a onclick="api('kb/approve',{id:${d.id},approved:${d.approved?0:1}}).then(()=>go('kb'))">${d.approved?'Bỏ duyệt':'Duyệt'}</button></div>`).join('')+'<div class=card>Thêm: <input id=kt placeholder=Tiêu đề> <input id=kbd placeholder=Nội dung size=50> <button class=a onclick="api(\'kb/save\',{title:kt.value,body:kbd.value}).then(()=>go(\'kb\'))">Lưu (chưa duyệt)</button></div>')},
+ async style(){const r=await api('style');M(r.profiles.map(p=>`<div class=card><b>${E(p.name)}</b> v${p.version} <span class=tag>${p.approved?'đã duyệt - đang dùng':'chưa duyệt - CHƯA dùng'}</span>
+  <textarea id=sb${p.id} rows=10 style="width:100%">${E(p.body)}</textarea><br>
+  <button class=a onclick="api('style/save',{id:${p.id},body:document.getElementById('sb${p.id}').value}).then(()=>go('style'))">Lưu (phải duyệt lại)</button>
+  <button class=a onclick="api('style/approve',{id:${p.id},approved:${p.approved?0:1}}).then(()=>go('style'))">${p.approved?'Bỏ duyệt':'Duyệt & dùng'}</button>
+  <div class=mut>Phong cách chỉ quy định cách nói; không ghi đè quy tắc an toàn.</div></div>`).join('')+'<h3>Ví dụ từ các lần bạn sửa nháp</h3>'+r.examples.map(e=>`<div class=card><span class=tag>${E(e.status)}</span><br>AI: ${E(e.original)}<br>Đã sửa: ${E(e.edited)}<br>
+  Quy tắc rút ra: <input id=ru${e.id} value="${E(e.rule||'')}" size=40> <button class=a onclick="api('style/example',{id:${e.id},status:'confirmed',rule:document.getElementById('ru${e.id}').value}).then(()=>go('style'))">Xác nhận (dùng làm mẫu)</button> <button class=d onclick="api('style/example',{id:${e.id},status:'rejected'}).then(()=>go('style'))">Bỏ</button></div>`).join(''))},
+ async audit(){const a=await api('audit');M('<table>'+a.map(x=>`<tr><td>${dtf(x.ts)}</td><td>${E(x.actor)}</td><td>${E(x.action)}</td><td class=mut>${E(x.detail)}</td></tr>`).join('')+'</table>')}};
+boot();
+</script></body></html>
