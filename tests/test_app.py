@@ -35,3 +35,30 @@ def test_kb_edit_requires_reapproval_and_rollback():
 def test_audit_written_for_sensitive_changes():
     a = mk(); a.handle("manager", "POST", "/api/kill", {"on": 1})
     assert any(r["action"] == "kill_switch" for r in a.db.q("SELECT * FROM audit"))
+
+
+def test_bridge_role_is_ingest_only_and_logs_nothing_else():
+    a = mk(); a.bridge = "b"
+    assert a.role("b") == "bridge"
+    for m, path in (("GET", "/api/groups"), ("GET", "/api/report"), ("POST", "/api/kill"), ("POST", "/api/group/pause"), ("GET", "/api/messages/1")):
+        with pytest.raises(PermissionError): a.handle("bridge", m, path, {"on": 1, "id": 1, "paused": 1})
+
+
+def test_bridge_ingest_allowlist_dedupe_self_and_heartbeat():
+    a = mk(); g = a.handle("manager", "POST", "/api/group/add", {"channel": "zalo", "external_id": "G1", "name": "t"})
+    a.handle("bridge", "POST", "/api/bridge/heartbeat", {"channel": "zalo", "state": "ok", "own_id": "OWN"})
+    mm = lambda i, **k: dict(group_ext_id="G1", msg_ext_id=i, sender_ext_id="u", ts=1.0, text="hi", **k)
+    r = a.handle("bridge", "POST", "/api/bridge/ingest", {"channel": "zalo", "messages": [mm("1"), mm("1"), mm("2", is_self=True), dict(mm("3"), group_ext_id="OTHER")]})
+    assert r == {"stored": 2, "duplicate": 1, "dropped_unlisted": 1}
+    assert a.db.one("SELECT is_ai FROM messages WHERE ext_id='2'")["is_ai"] == 1 and a.db.one("SELECT is_ai FROM messages WHERE ext_id='1'")["is_ai"] == 0
+    assert a.db.one("SELECT source FROM groups WHERE external_id='G1'")["source"] == "real"
+    a.hb_timeout = -1; a.refresh_channels()      # mất nhịp -> down -> có cảnh báo
+    assert a.db.one("SELECT state FROM channel_status")["state"] == "down"
+    assert any(x["kind"] == "channel_down" for x in a.handle("manager", "GET", "/api/alerts", {})["alerts"])
+
+
+def test_readonly_channel_cannot_send():
+    a = mk(); a.handle("manager", "POST", "/api/group/add", {"channel": "zalo", "external_id": "G1", "name": "t"})
+    a.db.x("UPDATE groups SET mode='live'"); a.db.x("INSERT INTO drafts(group_id,created,text,status,flags,sources) VALUES(1,1,'x','pending','[]','[]')")
+    r = a.handle("manager", "POST", "/api/draft/approve", {"id": 1})
+    assert not r["ok"] and "CHỈ ĐỌC" in r["reason"] and a.db.one("SELECT status FROM drafts")["status"] == "approved"

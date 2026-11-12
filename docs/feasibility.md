@@ -8,7 +8,7 @@
 | Phương án | Điều đã biết (nguồn) | Mức | Nhận xét |
 |---|---|---|---|
 | **Zalo OA / Zalo Bot Platform (chính thức)** | Bot API có `chatId`; với nhóm thì chatId là group ID ([zalo-bot-js](https://kaiyodev.github.io/zalo-bot-js/en/send-message), [chat-sdk](https://chat-sdk.dev/adapters/zalo) ghi nhóm "Pending"). Tài liệu OpenClaw nói bot Zalo thực tế **không thêm được vào nhóm** ([docs.openclaw.ai/channels/zalo](https://docs.openclaw.ai/channels/zalo)). SDK cộng đồng có "Group Message Framework" cho nhóm do OA/asset quản lý ([redai-zalo-sdk](https://unpkg.com/@warriorteam/redai-zalo-sdk@1.39.2/README.md)). | 🟨 (mâu thuẫn) | Có vẻ **không áp dụng cho nhóm Zalo thường hiện có**. Đây là hộp thư OA/nhóm kiểu khác → **không tự thay thế**; nếu muốn, cần bạn quyết định (khác biệt: khách phải theo dõi OA, nhóm do OA tạo, mất nhóm cũ). |
-| **Thư viện không chính thức `zca-js`** (MIT, mô phỏng Zalo Web, đăng nhập QR) | README: dành cho tài khoản cá nhân, **cảnh báo có thể bị khóa/cấm tài khoản** ([github.com/RFS-ADRENO/zca-js](https://github.com/RFS-ADRENO/zca-js), [npm](https://npmjs.com/package/zca-js)). Một danh sách ghi push cuối 05/2025 — **chưa kiểm tra bảo trì hiện tại**. OpenClaw có plugin dùng nó và cũng cảnh báo rủi ro cấm ([docs](https://docs.openclaw.ai/channels/zalouser.md)). | 🟨 | Là đường **duy nhất nghe có thể đọc/gửi trong nhóm thường**. Rủi ro: khóa tài khoản, API đổi bất ngờ, không có SLA. Chưa có điều khoản Zalo cấm/cho phép rõ (không tìm thấy điều khoản gốc về tự động hóa) → cần đọc điều khoản hiện hành. |
+| **Thư viện không chính thức `zca-js`** (MIT, mô phỏng Zalo Web, đăng nhập QR) | README: dành cho tài khoản cá nhân, **cảnh báo có thể bị khóa/cấm tài khoản** ([github.com/RFS-ADRENO/zca-js](https://github.com/RFS-ADRENO/zca-js), [npm](https://npmjs.com/package/zca-js)). Kiểm tra npm 2026-11-12: bản 2.2.0 phát hành 2026-09-09, MIT → đang được bảo trì. OpenClaw có plugin dùng nó và cũng cảnh báo rủi ro cấm ([docs](https://docs.openclaw.ai/channels/zalouser.md)). | 🟨 | Là đường **duy nhất nghe có thể đọc/gửi trong nhóm thường**. Rủi ro: khóa tài khoản, API đổi bất ngờ, không có SLA. Chưa có điều khoản Zalo cấm/cho phép rõ (không tìm thấy điều khoản gốc về tự động hóa) → cần đọc điều khoản hiện hành. |
 | **Tự động hóa giao diện (Android/emulator + Accessibility)** | Chưa nghiên cứu nguồn riêng. | 🟥 giả định | Chậm, dễ vỡ khi app cập nhật, khó đọc ảnh/ghi âm, cần thiết bị chạy 24/7; rủi ro điều khoản tương tự. Dự phòng cuối. |
 | **Chế độ chỉ-thủ-công** (CSKH dán đoạn chat vào hệ thống/xuất chat) | Không phụ thuộc nền tảng. | 🟩 (tự nhiên) | Không tự động, nhưng **giám sát chất lượng (chức năng B) vẫn dùng được** và rủi ro tài khoản bằng 0. |
 
@@ -35,3 +35,8 @@ Nhận tin mới/lịch sử/ảnh/file/ghi âm/mention/reply/gửi: **chưa bi�
 2. Messenger: (a) chỉ-thủ-công (khuyến nghị tới khi có bằng chứng) · (b) thử không chính thức với tài khoản/nhóm thử · (c) khảo sát Fanpage Inbox (đổi kênh).
 3. Ai có quyền: danh sách nhóm được phép, tên/biệt danh trợ lý, kênh nhận báo cáo (khu quản lý trong giao diện này là mặc định; email/Zalo/Slack chưa bật).
 4. Chuẩn dịch vụ (giờ làm, SLA) để thay bản nháp.
+
+## Cập nhật 2026-11-12 (sau khi bạn chọn Zalo/Messenger cá nhân)
+- zca-js 2.2.0 cài được; API có `listener` (message/connected/disconnected/closed), `getAllGroups`, `getGroupInfo`, `sendMessage`, tin nhóm có `mentions` và `quote` (🟨 theo kiểu dữ liệu, 🟥 chưa thử thật).
+- Sandbox của tôi bị chặn Zalo/Facebook → cầu nối phải chạy trên máy bạn: xem `docs/connect-zalo.md`.
+- Messenger: xem `docs/messenger-vetting.md`.

@@ -18,13 +18,17 @@ class App:
         self.out = Outbox(self.db, self.adapters)
         self.mgr = os.environ.get("CAREAI_ADMIN_TOKEN") or secrets.token_urlsafe(24)
         self.staff = os.environ.get("CAREAI_STAFF_TOKEN") or ""
+        self.bridge = os.environ.get("CAREAI_BRIDGE_TOKEN") or ""
+        self.hb_timeout = 90
 
     def role(self, tok):
         if tok and hmac.compare_digest(tok, self.mgr): return "manager"
         if tok and self.staff and hmac.compare_digest(tok, self.staff): return "staff"
+        if tok and self.bridge and hmac.compare_digest(tok, self.bridge): return "bridge"
         return None
 
     def refresh_channels(self):
+        self.db.x("UPDATE channel_status SET state='down', detail='mất heartbeat từ cầu nối' WHERE state IN ('ok','degraded') AND ts<?", time.time() - self.hb_timeout)
         for n, a in self.adapters.items():
             st, d = a.health()
             self.db.x("INSERT INTO channel_status(channel,state,detail,ts) VALUES(?,?,?,?) ON CONFLICT(channel) DO UPDATE SET state=excluded.state,detail=excluded.detail,ts=excluded.ts", n, st, d, time.time())
@@ -33,6 +37,22 @@ class App:
         db, now = self.db, time.time()
         p = path.rstrip("/").split("/")[2:]   # sau /api
         mgr = role == "manager"
+        if role == "bridge":   # cầu nối chỉ được đẩy tin vào và báo nhịp, không đọc/sửa gì khác
+            if method == "POST" and p == ["bridge", "heartbeat"]:
+                if body["state"] not in ("ok", "down", "degraded"): raise ValueError("state")
+                if body.get("own_id"): self.ing.ai_ext_ids[body["channel"]] = str(body["own_id"])
+                db.x("INSERT INTO channel_status(channel,state,detail,ts) VALUES(?,?,?,?) ON CONFLICT(channel) DO UPDATE SET state=excluded.state,detail=excluded.detail,ts=excluded.ts",
+                     body["channel"], body["state"], str(body.get("detail", ""))[:200], now)
+                return {"ok": True}
+            if method == "POST" and p == ["bridge", "ingest"]:
+                from .channels.base import InboundMessage
+                res = {"stored": 0, "duplicate": 0, "dropped_unlisted": 0}
+                for m in body["messages"][:200]:
+                    sender = self.ing.ai_ext_ids.get(body["channel"]) if m.get("is_self") else m["sender_ext_id"]
+                    res[self.ing.handle(InboundMessage(body["channel"], m["group_ext_id"], m["msg_ext_id"], sender, m.get("sender_name", ""),
+                                       float(m["ts"]), m.get("text", ""), m.get("kind", "text"), m.get("reply_to_ext_id"), m.get("mentions", []), "real"))] += 1
+                return res
+            raise PermissionError
         if method == "GET":
             if p == ["status"]:
                 self.refresh_channels()
@@ -45,7 +65,7 @@ class App:
             if not mgr: raise PermissionError
             if p == ["report"]: return reports.daily(db, self.std, now)
             if p == ["report.md"]: return {"markdown": reports.to_markdown(reports.daily(db, self.std, now))}
-            if p == ["alerts"]: return reports.alerts(db, self.std, now)
+            if p == ["alerts"]: self.refresh_channels(); return reports.alerts(db, self.std, now)
             if p == ["drafts"]: return db.q("SELECT d.*,g.name gname FROM drafts d JOIN groups g ON g.id=d.group_id ORDER BY d.id DESC LIMIT 100")
             if p == ["kb"]: return db.q("SELECT * FROM kb_docs")
             if p == ["tasks"]: return db.q("SELECT t.*,g.name gname FROM tasks t LEFT JOIN groups g ON g.id=t.group_id")

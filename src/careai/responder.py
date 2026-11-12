@@ -184,6 +184,7 @@ class Outbox:
         if not g["allowed"]: return {"ok": False, "reason": "nhóm không nằm trong danh sách cho phép"}
         if g["mode"] != "live": return {"ok": False, "reason": "nhóm đang ở chế độ xem trước (chưa live)"}
         if g["paused"]: return {"ok": False, "reason": "AI đang tạm dừng ở nhóm này"}
+        if g["channel"] not in self.adapters: return {"ok": False, "reason": f"kênh {g['channel']} đang CHỈ ĐỌC (chưa có bộ gửi được kiểm chứng)"}
         key = f"draft-{d['id']}"
         if self.db.one("SELECT 1 FROM outbox_log WHERE idem_key=?", key):
             return {"ok": False, "reason": "đã gửi trước đó (chống gửi trùng)"}
