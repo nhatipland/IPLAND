@@ -71,6 +71,7 @@ class App:
             if p == ["tasks"]: return db.q("SELECT t.*,g.name gname FROM tasks t LEFT JOIN groups g ON g.id=t.group_id")
             if p == ["audit"]: return db.q("SELECT * FROM audit ORDER BY id DESC LIMIT 200")
             if p == ["improvements"]: return db.q("SELECT * FROM improvements ORDER BY id DESC LIMIT 100")
+            if p == ["style"]: return dict(profiles=db.q("SELECT * FROM style_profiles"), examples=db.q("SELECT * FROM style_examples ORDER BY id DESC LIMIT 100"))
             if p == ["usage"]: return db.one("SELECT COUNT(*) calls, COALESCE(SUM(in_chars),0) in_chars, COALESCE(SUM(out_chars),0) out_chars FROM ai_usage")
             if p[:1] == ["analysis"]: return Monitor(db, self.std).analyze(int(p[1]), now)
         if method == "POST":
@@ -98,6 +99,21 @@ class App:
             if p == ["review_note"]: db.x("INSERT INTO review_notes(group_id,finding_key,note,author,ts) VALUES(?,?,?,?,?)", body["group_id"], body.get("finding_key"), body["note"], actor, now); db.audit(actor, "review_note", body); return {"ok": True}
             if p == ["external_fact"]: db.x("INSERT INTO external_facts(group_id,text,author,ts) VALUES(?,?,?,?)", body["group_id"], body["text"], actor, now); db.audit(actor, "external_fact", body); return {"ok": True}
             if p == ["consent"]: db.x("INSERT INTO consent(group_id,member_ext,kind,ts,recorded_by) VALUES(?,?,?,?,?)", body["group_id"], body["member_ext"], body["kind"], now, actor); db.audit(actor, "consent", body); return {"ok": True}
+            if p == ["style", "save"]:
+                if body.get("id"):
+                    d = db.one("SELECT * FROM style_profiles WHERE id=?", body["id"])
+                    db.x("INSERT INTO style_versions VALUES(?,?,?,?)", d["id"], d["version"], d["body"], now)
+                    db.x("UPDATE style_profiles SET body=?, version=version+1, approved=0, ts=? WHERE id=?", body["body"], now, d["id"]); i = d["id"]   # sửa => duyệt lại
+                else: i = db.x("INSERT INTO style_profiles(name,body,ts) VALUES(?,?,?)", body["name"], body["body"], now)
+                db.audit(actor, "style_save", {"id": i}); return {"id": i}
+            if p == ["style", "approve"]: db.x("UPDATE style_profiles SET approved=? WHERE id=?", int(body["approved"]), body["id"]); db.audit(actor, "style_approve", body); return {"ok": True}
+            if p == ["style", "rollback"]:
+                v = db.one("SELECT * FROM style_versions WHERE profile_id=? AND version=?", body["id"], body["version"])
+                if not v: raise ValueError("không có phiên bản")
+                db.x("UPDATE style_profiles SET body=?, version=version+1, approved=0 WHERE id=?", v["body"], body["id"]); db.audit(actor, "style_rollback", body); return {"ok": True}
+            if p == ["style", "example"]:   # xác nhận/bỏ ví dụ + ghi quy tắc rút ra
+                if body["status"] not in ("confirmed", "rejected"): raise ValueError("status")
+                db.x("UPDATE style_examples SET status=?, rule=? WHERE id=?", body["status"], body.get("rule"), body["id"]); db.audit(actor, "style_example", body); return {"ok": True}
             if p == ["kb", "save"]:
                 if body.get("id"):
                     d = db.one("SELECT * FROM kb_docs WHERE id=?", body["id"])

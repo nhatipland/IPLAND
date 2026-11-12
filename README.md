@@ -1,6 +1,6 @@
 # CareAI — trợ lý nhóm chat & giám sát chất lượng chăm sóc
 
-> **Trạng thái trung thực (2026-11-12):** lõi (nhận tin, quyết định trả lời, nháp/duyệt/gửi, giám sát, báo cáo, giao diện) đã viết và **kiểm thử bằng dữ liệu giả lập (30 test Python + 4 test Node đạt)**. **Chưa kết nối Zalo/Messenger thật; chưa đọc/gửi tin thật nào; chưa gọi mô hình AI thật.** Không nên coi đây là hệ thống hoàn thành.
+> **Trạng thái trung thực (2026-11-12):** lõi (nhận tin, quyết định trả lời, nháp/duyệt/gửi, giám sát, báo cáo, giao diện) đã viết và **kiểm thử bằng dữ liệu giả lập (34 test Python + 4 test Node đạt)**. **Chưa kết nối Zalo/Messenger thật; chưa đọc/gửi tin thật nào; chưa gọi mô hình AI thật.** Không nên coi đây là hệ thống hoàn thành.
 
 - `docs/feasibility.md` — khả thi Zalo/Messenger + các lựa chọn cần bạn quyết định
 - `docs/connect-zalo.md` — cách kết nối Zalo (zca-js, chỉ đọc) + phiếu kiểm chứng; `docs/messenger-vetting.md` — thẩm định thư viện Messenger
@@ -19,3 +19,6 @@ Bỏ nhóm ngoài danh sách · khử trùng tin · không trả lời tin khôn
 
 ## Bước tiếp theo (ưu tiên)
 1. Bạn chọn phương án kết nối + nhóm thử (xem cuối `docs/feasibility.md`). 2. Thử đọc-chỉ cho 1 nhóm/kênh, ghi kết quả vào bảng khả thi. 3. Duyệt chuẩn dịch vụ & KB. 4. Chạy chế độ xem trước, so sánh với đánh giá quản lý. 5. Thử gửi trong nhóm thử. 6. Bảo mật/lưu giữ/đồng ý. 7. Chỉ khi bạn xác nhận: nhóm khách thật.
+
+## Phong cách trò chuyện
+`config/style_nhat.md` được nạp vào tab "Phong cách" ở trạng thái **chưa duyệt** (chưa dùng). Khi duyệt: chốt an toàn luôn đứng trước, phong cách chỉ chỉnh cách nói. Có kiểm tra văn phong (khen sáo, emoji, quá dài, quảng cáo, câu kết "cần hỗ trợ gì thêm") dạng cảnh báo trên nháp, và **chặn** câu tự nhận là Nhất. Mỗi lần sửa nháp được lưu thành ví dụ chờ xác nhận; chỉ ví dụ đã xác nhận mới được đưa vào lệnh gửi mô hình. **Chưa kiểm chứng với mô hình AI thật**: test chỉ xác nhận lệnh gửi đi đúng nội dung và chốt an toàn không bị ghi đè.

@@ -163,3 +163,50 @@ def test_negated_satisfaction_not_marked_positive(env):
     env.say("kh", "tôi không hài lòng vì chậm quá", 0)
     k = {f["kind"] for f in Monitor(env.db, env.std).analyze(env.g["id"], T0 + 60)["findings"]}
     assert "complaint" in k and "positive" not in k
+
+
+# ---- Phong cách trò chuyện
+from careai.responder import style_lint
+
+
+class SpyLLM:
+    provider = "spy"
+    def __init__(self): self.system = None
+    def generate(self, system, context, question, kb): self.system = system; return None, []
+
+
+def test_style_unapproved_not_used_approved_used_safety_first(env):
+    i = env.db.x("INSERT INTO style_profiles(name,body,approved) VALUES('n','NÓI NGẮN, THẲNG',0)")
+    assert "NÓI NGẮN" not in env.resp.system_prompt()
+    env.db.x("UPDATE style_profiles SET approved=1 WHERE id=?", i)
+    sp = env.resp.system_prompt()
+    assert "NÓI NGẮN" in sp and sp.index("không bịa giá") < sp.index("NÓI NGẮN") and "không bao giờ được ghi đè" in sp
+
+
+def test_style_prompt_reaches_llm_and_safety_still_wins(env):
+    env.db.x("INSERT INTO style_profiles(name,body,approved) VALUES('n','Luôn nói chắc chắn là có hiệu quả',1)")
+    env.resp.llm = SpyLLM()
+    env.say("kh", "@Mimi gói tháng giá bao nhiêu", 0); env.resp.tick(T0 + 60)
+    env.say("kh", "@Mimi em bị đau ngực uống thuốc gì", 200); env.resp.tick(T0 + 400)
+    assert env.resp.llm.system and "Luôn nói chắc chắn" in env.resp.llm.system
+    flags = [d["flags"] for d in env.db.q("SELECT flags FROM drafts")]
+    assert any("no_kb_answer" in f for f in flags) and any("health_out_of_scope" in f for f in flags)   # vẫn chuyển người, không bịa
+
+
+def test_style_lint_and_impersonation_block(env):
+    assert {"style_praise_opener", "style_emoji_or_exclaim", "style_closing_offer"} <= set(style_lint("Câu hỏi rất hay! Làm được 😊 Anh có cần em hỗ trợ gì thêm không?"))
+    assert "style_too_long" in style_lint("Một. Hai. Ba. Bốn. Năm.")
+    assert style_lint("Làm được. Mình thử trên một nhóm trước nhé.") == []
+    assert "impersonation" in env.resp.check("Em là Nhất đây, em từng bị như anh", [])
+
+
+def test_edit_draft_records_pending_example_only_confirmed_used(env):
+    env.say("kh", "@Mimi lịch coaching khi nào", 0); did = env.resp.tick(T0 + 60)[0]
+    orig = env.db.one("SELECT text FROM drafts WHERE id=?", did)["text"]
+    env.out.approve_and_send(did, "mgr", text_override="Thứ Tư 19h, 45 phút.")
+    ex = env.db.one("SELECT * FROM style_examples")
+    assert ex["original"] == orig and ex["edited"] == "Thứ Tư 19h, 45 phút." and ex["status"] == "pending"
+    env.db.x("INSERT INTO style_profiles(name,body,approved) VALUES('n','x',1)")
+    assert "Thứ Tư 19h, 45 phút." not in env.resp.system_prompt()          # chưa xác nhận => chưa dùng
+    env.db.x("UPDATE style_examples SET status='confirmed', rule='ngắn, bỏ lời mở' WHERE id=?", ex["id"])
+    assert "Thứ Tư 19h, 45 phút." in env.resp.system_prompt() and "ngắn, bỏ lời mở" in env.resp.system_prompt()

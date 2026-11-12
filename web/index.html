@@ -23,7 +23,7 @@ const E=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
 const dtf=t=>t?new Date(t*1000).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}):'';
 async function api(p,b){const r=await fetch('/api/'+p,{method:b?'POST':'GET',headers:{Authorization:'Bearer '+T,'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});
  const j=await r.json();if(!r.ok){alert(j.error||r.status);throw j}return j}
-const tabs={status:'Kết nối',groups:'Nhóm & vai trò',drafts:'Xem trước trả lời',report:'Báo cáo',alerts:'Cảnh báo',tasks:'Việc cần xử lý',kb:'Kiến thức',audit:'Nhật ký'};
+const tabs={status:'Kết nối',groups:'Nhóm & vai trò',drafts:'Xem trước trả lời',report:'Báo cáo',alerts:'Cảnh báo',tasks:'Việc cần xử lý',kb:'Kiến thức',style:'Phong cách',audit:'Nhật ký'};
 function nav(){document.getElementById('nav').innerHTML=Object.entries(tabs).map(([k,v])=>`<button class="${k==tab?'on':''}" onclick="go('${k}')">${v}</button>`).join('')}
 async function go(t){tab=t;nav();await R[t]()}
 const M=h=>document.getElementById('m').innerHTML=h;
@@ -52,6 +52,12 @@ const R={
  async alerts(){const a=await api('alerts');M(a.alerts.map(x=>`<div class=card><span class=tag>${E(x.kind)}</span> ${E(x.group||'')} ${E(x.text)}</div>`).join('')||'<div class=card>Không có cảnh báo.</div>')},
  async tasks(){const t=await api('tasks');M('<div class=card>Tạo việc: <input id=tt placeholder="Việc"> <input id=ta placeholder="Người phụ trách"> <button class=a onclick="api(\'task\',{title:tt.value,assignee:ta.value}).then(()=>go(\'tasks\'))">Thêm</button></div>'+t.map(x=>`<div class=card>${E(x.title)} · ${E(x.assignee)} · <span class=tag>${E(x.status)}</span> <button class=a onclick="api('task/status',{id:${x.id},status:'done'}).then(()=>go('tasks'))">Xong</button></div>`).join(''))},
  async kb(){const k=await api('kb');M(k.map(d=>`<div class=card><b>${E(d.title)}</b> v${d.version} <span class=tag>${d.approved?'đã duyệt':'chưa duyệt'}</span><br>${E(d.body)}<br><button class=a onclick="api('kb/approve',{id:${d.id},approved:${d.approved?0:1}}).then(()=>go('kb'))">${d.approved?'Bỏ duyệt':'Duyệt'}</button></div>`).join('')+'<div class=card>Thêm: <input id=kt placeholder=Tiêu đề> <input id=kbd placeholder=Nội dung size=50> <button class=a onclick="api(\'kb/save\',{title:kt.value,body:kbd.value}).then(()=>go(\'kb\'))">Lưu (chưa duyệt)</button></div>')},
+ async style(){const r=await api('style');M(r.profiles.map(p=>`<div class=card><b>${E(p.name)}</b> v${p.version} <span class=tag>${p.approved?'đã duyệt - đang dùng':'chưa duyệt - CHƯA dùng'}</span>
+  <textarea id=sb${p.id} rows=10 style="width:100%">${E(p.body)}</textarea><br>
+  <button class=a onclick="api('style/save',{id:${p.id},body:document.getElementById('sb${p.id}').value}).then(()=>go('style'))">Lưu (phải duyệt lại)</button>
+  <button class=a onclick="api('style/approve',{id:${p.id},approved:${p.approved?0:1}}).then(()=>go('style'))">${p.approved?'Bỏ duyệt':'Duyệt & dùng'}</button>
+  <div class=mut>Phong cách chỉ quy định cách nói; không ghi đè quy tắc an toàn.</div></div>`).join('')+'<h3>Ví dụ từ các lần bạn sửa nháp</h3>'+r.examples.map(e=>`<div class=card><span class=tag>${E(e.status)}</span><br>AI: ${E(e.original)}<br>Đã sửa: ${E(e.edited)}<br>
+  Quy tắc rút ra: <input id=ru${e.id} value="${E(e.rule||'')}" size=40> <button class=a onclick="api('style/example',{id:${e.id},status:'confirmed',rule:document.getElementById('ru${e.id}').value}).then(()=>go('style'))">Xác nhận (dùng làm mẫu)</button> <button class=d onclick="api('style/example',{id:${e.id},status:'rejected'}).then(()=>go('style'))">Bỏ</button></div>`).join(''))},
  async audit(){const a=await api('audit');M('<table>'+a.map(x=>`<tr><td>${dtf(x.ts)}</td><td>${E(x.actor)}</td><td>${E(x.action)}</td><td class=mut>${E(x.detail)}</td></tr>`).join('')+'</table>')}};
 boot();
 </script></body></html>

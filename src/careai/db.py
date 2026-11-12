@@ -34,6 +34,9 @@ CREATE TABLE IF NOT EXISTS consent(
   group_id INTEGER, member_ext TEXT, kind TEXT, ts REAL, recorded_by TEXT);
 CREATE TABLE IF NOT EXISTS improvements(
   id INTEGER PRIMARY KEY, group_id INTEGER, kind TEXT, detail TEXT, status TEXT DEFAULT 'open', ts REAL);
+CREATE TABLE IF NOT EXISTS style_profiles(id INTEGER PRIMARY KEY, name TEXT, body TEXT, version INTEGER DEFAULT 1, approved INTEGER DEFAULT 0, ts REAL);
+CREATE TABLE IF NOT EXISTS style_versions(profile_id INTEGER, version INTEGER, body TEXT, ts REAL);
+CREATE TABLE IF NOT EXISTS style_examples(id INTEGER PRIMARY KEY, group_id INTEGER, original TEXT, edited TEXT, rule TEXT, status TEXT DEFAULT 'pending', author TEXT, ts REAL);
 CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, ts REAL, actor TEXT, action TEXT, detail TEXT);
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS channel_status(channel TEXT PRIMARY KEY, state TEXT, detail TEXT, ts REAL);
